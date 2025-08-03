@@ -23,7 +23,8 @@ func InitMysql() {
 	}
 
 	// 自动迁移
-	if DB.AutoMigrate(&models.User{}) != nil {
+	err = DB.AutoMigrate(&models.User{}, &models.Post{}, &models.Tag{}, &models.Comment{})
+	if err != nil {
 		log.Fatalf("Failed to auto migrate err: %v", err)
 	}
 

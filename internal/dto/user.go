@@ -24,6 +24,7 @@ type UserInfoDTO struct {
 	ID       uint   `json:"id"`
 	UserName string `json:"username"`
 	Email    string `json:"email"`
+	Avatar   string `json:"avatar"`
 }
 
 type LoginResponseDTO struct {
@@ -39,5 +40,4 @@ type VerifyResetReqDTO struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6,max=15"`
 	Code     string `json:code binding:"required,len=6"`
-
 }

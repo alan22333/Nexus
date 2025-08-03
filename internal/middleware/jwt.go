@@ -13,7 +13,8 @@ import (
 
 // 假设的配置，你应该从你的 config 包导入
 var jwtSecret = []byte(configs.Conf.JWT.Secret)
-var duration = configs.Conf.JWT.ExpireHours
+
+// var duration = configs.Conf.JWT.ExpireHours
 
 type MyClaims struct {
 	UserID uint `json:"user_id"`
@@ -70,11 +71,15 @@ func JWTAuth() gin.HandlerFunc {
 
 // GenerateToken 生成一个 JWT token（传入用户ID）
 func GenerateToken(userID uint) (string, error) {
+
+	// 动态加载，放弃全局变量
+	expireHours := time.Duration(configs.Conf.JWT.ExpireHours)
+
 	claims := MyClaims{
 		UserID: userID, // 写入自定义字段
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Duration(duration) * time.Hour)), // 设置7天过期时间
-			Issuer:    "Nexus",                                                               // 谁签发了这个token（可选）
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expireHours * time.Hour)), // 设置7天过期时间
+			Issuer:    "Nexus",                                                     // 谁签发了这个token（可选）
 		},
 	}
 
