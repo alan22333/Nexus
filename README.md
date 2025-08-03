@@ -1,4 +1,5 @@
 # Nexus
 a Nexus of everything
 
-- 7-30:starter finish！
+- 7-30:starter finish:基本登录框架，邮箱验证吗验证注册、邮箱或用户名登录、邮箱验证码重制密码
+- 8-1:finish phase2:帖子的增删改查
