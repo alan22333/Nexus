@@ -9,6 +9,7 @@ import (
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
+	r.Use(middleware.ErrorHandler())
 
 	v1 := r.Group("/api/v1")
 	{

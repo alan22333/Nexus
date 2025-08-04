@@ -14,7 +14,7 @@ func Register(c *gin.Context) {
 	var reqDTO dto.RegisterReqDTO
 	err := c.ShouldBindJSON(&reqDTO)
 	if err != nil {
-		res.FailWithAppErr(c, erru.ErrInvalidParams.Wrap(err))
+		c.Error( erru.ErrInvalidParams.Wrap(err))
 		return
 	}
 	// log.Println(reqDTO)
@@ -31,7 +31,7 @@ func VerifyRegister(c *gin.Context) {
 	var reqDto dto.VerifyRegisterReqDTO
 	err := c.ShouldBindJSON(&reqDto)
 	if err != nil {
-		res.FailWithAppErr(c, erru.ErrInvalidParams.Wrap(err))
+		c.Error(erru.ErrInvalidParams.Wrap(err))
 		return
 	}
 
@@ -46,7 +46,7 @@ func VerifyRegister(c *gin.Context) {
 func Login(c *gin.Context) {
 	var reqDTO dto.LoginReqDTO
 	if err := c.ShouldBindJSON(&reqDTO); err != nil {
-		res.FailWithAppErr(c, erru.ErrInvalidParams.Wrap(err))
+		c.Error(erru.ErrInvalidParams.Wrap(err))
 		return
 	}
 
@@ -57,7 +57,7 @@ func Login(c *gin.Context) {
 	//token
 	token, err := middleware.GenerateToken(user.ID)
 	if err != nil {
-		res.FailWithAppErr(c, erru.New("token 生成错误"))
+		c.Error(erru.New("token 生成错误"))
 		return
 	}
 	// encapsulate
@@ -77,7 +77,8 @@ func RequestReset(c *gin.Context) {
 	var reqDTO dto.RequestResetReqDTO
 	err := c.ShouldBindJSON(&reqDTO)
 	if err != nil {
-		res.FailWithAppErr(c, erru.ErrInvalidParams.Wrap(err))
+		c.Error(erru.ErrInvalidParams.Wrap(err))
+		return
 	}
 	// log.Println(reqDTO)
 	err = service.RequestReset(&reqDTO)
@@ -92,7 +93,7 @@ func VerifyReset(c *gin.Context) {
 	var reqDto dto.VerifyResetReqDTO
 	err := c.ShouldBindJSON(&reqDto)
 	if err != nil {
-		res.FailWithAppErr(c, erru.ErrInvalidParams.Wrap(err))
+		c.Error(erru.ErrInvalidParams.Wrap(err))
 		return
 	}
 

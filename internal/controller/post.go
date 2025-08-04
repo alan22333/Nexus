@@ -15,7 +15,7 @@ func ListPosts(c *gin.Context) {
 	var reqDto dto.ListPostsReqDTO
 	err := c.ShouldBindQuery(&reqDto)
 	if err != nil {
-		res.FailWithAppErr(c, erru.ErrInvalidParams.Wrap(err))
+		c.Error(erru.ErrInvalidParams.Wrap(err))
 		return
 	}
 
@@ -71,7 +71,7 @@ func GetPost(c *gin.Context) {
 	// err := c.ShouldBindUri(postId)
 	postId := c.Param("id")
 	if postId == "" {
-		res.FailWithAppErr(c, erru.ErrInvalidParams)
+		c.Error(erru.ErrInvalidParams)
 		return
 	}
 	// log.Println("postId:", postId)
@@ -149,8 +149,7 @@ func CreatePost(c *gin.Context) {
 	var reqDto dto.CreatePostReqDTO
 	err := c.ShouldBindJSON(&reqDto)
 	if err != nil {
-		// TODO:错误处理还是设计的有问题
-		res.FailWithAppErr(c, erru.ErrInvalidParams.Wrap(err))
+		c.Error(erru.ErrInvalidParams.Wrap(err))
 		return
 	}
 	// log.Println(reqDto)
@@ -172,7 +171,7 @@ func UpdatePost(c *gin.Context) {
 	postId := c.Param("id")
 	err := c.ShouldBindJSON(&reqDto)
 	if postId == "" || err != nil {
-		res.FailWithAppErr(c, erru.ErrInvalidParams)
+		c.Error(erru.ErrInvalidParams)
 		return
 	}
 	userId := c.MustGet("userID").(uint)
@@ -190,7 +189,7 @@ func UpdatePost(c *gin.Context) {
 func DeletePost(c *gin.Context) {
 	postId := c.Param("id")
 	if postId == "" {
-		res.FailWithAppErr(c, erru.ErrInvalidParams)
+		c.Error(erru.ErrInvalidParams)
 		return
 	}
 	userId := c.MustGet("userID").(uint)
