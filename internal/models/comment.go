@@ -11,7 +11,7 @@ type Comment struct {
 	User   User `gorm:"foreignKey:UserID"`
 
 	PostID uint `gorm:"not null"`
-	
+
 	// --- 回复机制 (Reply Mechanism) ---
 	// ParentID 指向它所回复的另一条评论的 ID。
 	// 如果是顶级评论，ParentID 为 0。

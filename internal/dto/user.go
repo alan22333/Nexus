@@ -41,3 +41,10 @@ type VerifyResetReqDTO struct {
 	Password string `json:"password" binding:"required,min=6,max=15"`
 	Code     string `json:code binding:"required,len=6"`
 }
+
+//	--------------------头像----------------------
+//
+// UpdateAvatarResDTO 定义了更新头像成功后的响应格式
+type UpdateAvatarResDTO struct {
+	AvatarURL string `json:"avatar_url"`
+}

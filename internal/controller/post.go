@@ -6,6 +6,7 @@ import (
 	"Nuxus/internal/res"
 	"Nuxus/internal/service"
 	"Nuxus/pkg/erru"
+	"log"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -81,6 +82,8 @@ func GetPost(c *gin.Context) {
 		return
 	}
 
+	log.Println(post.User)
+
 	// encapsulate
 	postDetail := postModel2DetailDTO(post)
 
@@ -114,14 +117,9 @@ func postModel2InfoDTO(post *models.Post) *dto.PostInfoResDTO {
 
 func postModel2DetailDTO(post *models.Post) *dto.PostDetailResDTO {
 	postInfo := &dto.PostDetailResDTO{
-		ID:    post.ID,
-		Title: post.Title,
-		Author: dto.UserInfoDTO{
-			ID:       post.User.ID,
-			UserName: post.User.Username,
-			Email:    post.User.Email,
-			Avatar:   post.User.Avatar,
-		},
+		ID:            post.ID,
+		Title:         post.Title,
+		Author:        *userModel2InfoDto(&post.User),
 		Content:       post.Content,
 		ViewCount:     post.ViewCount,
 		LikeCount:     post.LikeCount,
@@ -201,4 +199,110 @@ func DeletePost(c *gin.Context) {
 	}
 
 	res.OkWithMsg(c, "删除成功")
+}
+
+// --------------交互相关：点赞、收藏、评论------------------------------
+
+func ListComment(c *gin.Context) {
+	postID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
+
+	comments, total, err := service.ListComment(uint(postID), page, size)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	commentsDto := make([]dto.CommentInfo, 0, len(comments))
+	for _, comment := range comments {
+		commentsDto = append(commentsDto, *commentModel2ResDTO(comment))
+	}
+
+	resDto := dto.ListCommentResDto{
+		Total:    total,
+		Comments: commentsDto,
+	}
+
+	res.OkWithData(c, resDto)
+}
+
+func commentModel2ResDTO(comment *models.Comment) *dto.CommentInfo {
+	return &dto.CommentInfo{
+		Id:        comment.ID,
+		Content:   comment.Content,
+		Author:    *userModel2InfoDto(&comment.User),
+		ParentId:  comment.ParentID,
+		CreatedAt: comment.CreatedAt,
+	}
+}
+
+func CreateComment(c *gin.Context) {
+	var reqDto dto.CreateCommentReqDTO
+	err := c.ShouldBindJSON(&reqDto)
+	if err != nil {
+		c.Error(erru.ErrInvalidParams.Wrap(err))
+		return
+	}
+
+	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	userId := c.MustGet("userID").(uint)
+
+	comment, err := service.CreateComment(&reqDto, userId, uint(postId))
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	resDto := commentModel2ResDTO(comment)
+	res.OkWithData(c, resDto)
+}
+
+func DeleteComment(c *gin.Context) {
+	commentId, _ := strconv.ParseUint(c.Param("commentId"), 10, 32)
+	userId := c.MustGet("userID").(uint)
+
+	err := service.DeleteComment(uint(commentId), userId)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	res.OkWithMsg(c, "删除评论成功")
+}
+
+// ---------------------点赞、收藏--------------------------------
+func LikePost(c *gin.Context) {
+	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	userId := c.MustGet("userID").(uint)
+
+	actionState, newLikeCount, err := service.LikePost(uint(postId), userId)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	resDto := &dto.ToggleActionResDTO{
+		ActionState:  actionState,
+		CurrentCount: newLikeCount,
+	}
+
+	res.OkWithData(c, resDto)
+}
+
+func FavoritePost(c *gin.Context) {
+	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	userId := c.MustGet("userID").(uint)
+
+	actionState, newFavoriteCount, err := service.FavoritePost(uint(postId), userId)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+
+	resDto := &dto.ToggleActionResDTO{
+		ActionState:  actionState,
+		CurrentCount: newFavoriteCount,
+	}
+
+	res.OkWithData(c, resDto)
 }

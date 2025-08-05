@@ -9,7 +9,7 @@ import (
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
-	r.Use(middleware.ErrorHandler())
+	r.Use(middleware.ErrorHandler(), middleware.CORSMiddleware(), middleware.Recovery())
 
 	v1 := r.Group("/api/v1")
 	{
@@ -28,6 +28,11 @@ func SetupRouter() *gin.Engine {
 			post.GET("/", controller.ListPosts)
 			post.GET("/popular", controller.ListPopularPosts)
 			post.GET("/:id", controller.GetPost)
+
+			comment := post.Group("/:id/comments")
+			{
+				comment.GET("/", controller.ListComment)
+			}
 		}
 
 		tag := v1.Group("/tags")
@@ -39,12 +44,39 @@ func SetupRouter() *gin.Engine {
 		auth := v1.Group("")
 		auth.Use(middleware.JWTAuth())
 		{
+			me := auth.Group("me")
+			{
+				me.GET("/", controller.GetProfile)
+				me.PUT("/", controller.UpdateProfile)
+				me.POST("/avatar", controller.UpdateAvatar)
+
+				// accout := auth.Group("/account")
+				// {
+				// 	accout.POST("/password", controller.UpdatePassword)
+				// }
+			}
+
 			post := auth.Group("/posts")
 			{
 				post.POST("/", controller.CreatePost)
 				post.PUT("/:id", controller.UpdatePost)
 				post.DELETE("/:id", controller.DeletePost)
+
+				comment := post.Group("/:id/comments")
+				{
+					comment.POST("/", controller.CreateComment)
+				}
+
+				like := post.Group("/:id/like")
+				{
+					like.POST("/", controller.LikePost)
+				}
+				favorite := post.Group("/:id/favorite")
+				{
+					favorite.POST("/", controller.FavoritePost)
+				}
 			}
+			auth.DELETE("/comments/:commentId", controller.DeleteComment)
 
 		}
 	}

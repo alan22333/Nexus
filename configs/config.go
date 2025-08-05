@@ -16,6 +16,7 @@ type Config struct {
 	Redis  RedisConfig  `mapstructure:"redis"`
 	SMTP   SMTPConfig   `mapstructure:"smtp"`
 	JWT    JWTConfig    `mapstructure:"jwt"`
+	Qiniu  QiniuConfig  `mapstructure:"qiniu"`
 }
 
 type ServerConfig struct {
@@ -45,6 +46,14 @@ type SMTPConfig struct {
 type JWTConfig struct {
 	Secret      string `mapstructure:"secret"`
 	ExpireHours int    `mapstructure:"expireHours"`
+}
+
+type QiniuConfig struct {
+	AccessKey string `mapstructure:"access_key"`
+	SecretKey string `mapstructure:"secret_key"`
+	Bucket    string `mapstructure:"bucket"`
+	Domain    string `mapstructure:"domain"`
+	Zone      string `mapstructure:"zone"`
 }
 
 func Init() {
