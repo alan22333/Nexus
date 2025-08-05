@@ -234,6 +234,7 @@ func AddFavorite(tx *gorm.DB, userID, postID uint) error {
 	}
 	return tx.Table("user_post_favorites").Create(&favRecord).Error
 }
+
 // ------------------头像--------------------------------
 // UpdateUserAvatar 更新指定用户的头像 URL
 func UpdateUserAvatar(userID uint, avatarURL string) error {
