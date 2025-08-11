@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func ListPosts(reqDto *dto.ListPostsReqDTO) ([]*models.Post, int64, error) {
@@ -92,7 +93,12 @@ func UpdatePost(post *models.Post) (*models.Post, error) {
 }
 
 func DeletePost(postId string) error {
-	return DB.Delete(&models.Post{}, postId).Error
+	// 关键！DB.Select(clause.Associations)
+	// 这会告诉 GORM 在删除 Post 的同时，也处理其关联数据。
+	// 对于 many2many("Tags")，GORM 会自动去删除 post_tags 表中的相关记录。
+	// 注意：这里的 Delete 是软删除，因为它会看到 gorm.DeletedAt 字段。
+	err := DB.Select(clause.Associations).Delete(&models.Post{}, postId).Error
+	return err
 }
 
 // -----------------评论----------------------------
