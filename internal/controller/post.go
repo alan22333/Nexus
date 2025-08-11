@@ -70,13 +70,15 @@ func ListPopularPosts(c *gin.Context) {
 func GetPost(c *gin.Context) {
 	// var postId string
 	// err := c.ShouldBindUri(postId)
-	postId := c.Param("id")
-	if postId == "" {
+	// postId := c.Param("id")
+	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+
+	if postId == 0 {
 		c.Error(erru.ErrInvalidParams)
 		return
 	}
 	// log.Println("postId:", postId)
-	post, err := service.GetPostById(postId)
+	post, err := service.GetPostById(uint(postId))
 	if err != nil {
 		c.Error(err)
 		return
@@ -166,15 +168,17 @@ func CreatePost(c *gin.Context) {
 
 func UpdatePost(c *gin.Context) {
 	var reqDto dto.UpdatePostReqDTO
-	postId := c.Param("id")
+	// postId := c.Param("id")
+	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+
 	err := c.ShouldBindJSON(&reqDto)
-	if postId == "" || err != nil {
+	if postId == 0 || err != nil {
 		c.Error(erru.ErrInvalidParams)
 		return
 	}
 	userId := c.MustGet("userID").(uint)
 
-	post, err := service.UpdatePost(userId, postId, reqDto)
+	post, err := service.UpdatePost(userId, uint(postId), reqDto)
 	if err != nil {
 		c.Error(err)
 		return
@@ -185,14 +189,15 @@ func UpdatePost(c *gin.Context) {
 }
 
 func DeletePost(c *gin.Context) {
-	postId := c.Param("id")
-	if postId == "" {
+	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+
+	if postId == 0 {
 		c.Error(erru.ErrInvalidParams)
 		return
 	}
 	userId := c.MustGet("userID").(uint)
 
-	err := service.DeletePost(postId, userId)
+	err := service.DeletePost(uint(postId), userId)
 	if err != nil {
 		c.Error(err)
 		return

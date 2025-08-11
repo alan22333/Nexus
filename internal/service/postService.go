@@ -5,7 +5,6 @@ import (
 	"Nuxus/internal/dto"
 	"Nuxus/internal/models"
 	"Nuxus/pkg/erru"
-	"fmt"
 	"log"
 
 	"gorm.io/gorm"
@@ -19,7 +18,7 @@ func ListPosts(reqDto *dto.ListPostsReqDTO) ([]*models.Post, int64, error) {
 	return posts, total, nil
 }
 
-func GetPostById(id string) (*models.Post, error) {
+func GetPostById(id uint) (*models.Post, error) {
 	post, err := dao.GetPostById(id)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
@@ -85,7 +84,7 @@ func CreatePost(userID uint, reqDto *dto.CreatePostReqDTO) (*models.Post, error)
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
 
-	fullPost, err := dao.GetPostById(fmt.Sprint(post.ID))
+	fullPost, err := dao.GetPostById(post.ID)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -93,7 +92,7 @@ func CreatePost(userID uint, reqDto *dto.CreatePostReqDTO) (*models.Post, error)
 	return fullPost, nil
 }
 
-func UpdatePost(userId uint, postId string, reqDto dto.UpdatePostReqDTO) (*models.Post, error) {
+func UpdatePost(userId uint, postId uint, reqDto dto.UpdatePostReqDTO) (*models.Post, error) {
 	// 更新逻辑
 	// 1.检查post是否存在
 	// 2.检查是不是当前user的post
@@ -123,7 +122,7 @@ func UpdatePost(userId uint, postId string, reqDto dto.UpdatePostReqDTO) (*model
 	return post, nil
 }
 
-func DeletePost(postId string, userId uint) error {
+func DeletePost(postId uint, userId uint) error {
 	post, err := dao.GetPostById(postId)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
@@ -141,7 +140,7 @@ func ListComment(postId uint, page int, size int) ([]*models.Comment, int64, err
 	// 1.检查帖子是否存在
 	// 2.dao进行分页查询
 
-	_, err := dao.GetPostById(fmt.Sprint(postId))
+	_, err := dao.GetPostById(postId)
 	if err != nil {
 		return nil, 0, erru.ErrInternalServer.Wrap(err)
 	}
@@ -156,7 +155,7 @@ func ListComment(postId uint, page int, size int) ([]*models.Comment, int64, err
 
 func CreateComment(req *dto.CreateCommentReqDTO, userId uint, postId uint) (*models.Comment, error) {
 
-	_, err := dao.GetPostById(fmt.Sprint(postId))
+	_, err := dao.GetPostById(postId)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -213,7 +212,7 @@ func DeleteComment(commentId uint, userId uint) error {
 // --------------------点赞、收藏------------------------------
 func LikePost(postId uint, userId uint) (bool, int64, error) {
 	// 验证
-	post, err := dao.GetPostById(fmt.Sprint(postId))
+	post, err := dao.GetPostById(postId)
 	if err != nil {
 		return false, 0, erru.ErrInternalServer.Wrap(err)
 	}
@@ -269,7 +268,7 @@ func LikePost(postId uint, userId uint) (bool, int64, error) {
 
 func FavoritePost(postId uint, userId uint) (bool, int64, error) {
 	// 验证
-	post, err := dao.GetPostById(fmt.Sprint(postId))
+	post, err := dao.GetPostById(postId)
 	if err != nil {
 		return false, 0, erru.ErrInternalServer.Wrap(err)
 	}

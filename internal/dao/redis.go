@@ -36,7 +36,7 @@ const (
 	KeyPopularPosts     = "nexus:posts:popular"    // 热门帖子的 ZSET Key
 )
 
-func IncrementPostViewCount(postId string) error {
+func IncrementPostViewCount(postId uint) error {
 	key := fmt.Sprintf(PrefixPostViewCount, postId)
 	// INCR 命令：如果 key 不存在，会先创建为 0 再加 1。
 	// 所以无需担心初始化问题。
@@ -44,10 +44,10 @@ func IncrementPostViewCount(postId string) error {
 }
 
 // 更新帖子在热门榜单上的分数
-func IncrementPostRank(postID string, increment float64) error {
+func IncrementPostRank(postID uint, increment float64) error {
 	key := KeyPopularPosts
 	// ZINCRBY 命令：为一个 member 增加指定的分数
-	return RedisClient.ZIncrBy(Ctx, key, increment, postID).Err()
+	return RedisClient.ZIncrBy(Ctx, key, increment, fmt.Sprint(postID)).Err()
 }
 
 // GetPopularPostIDs 从榜单获取 Top N 的帖子 ID
