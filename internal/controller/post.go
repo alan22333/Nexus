@@ -227,6 +227,23 @@ func ListComment(c *gin.Context) {
 	res.OkWithData(c, resDto)
 }
 
+func GetUserStatus(c *gin.Context) {
+	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	userId := c.MustGet("userID").(uint)
+
+	liked, favorited, err := service.GetUserStatus(userId, uint(postId))
+	if err != nil {
+		c.Error(err)
+	}
+
+	resDto := dto.GetUserStatusResDTO{
+		Liked:     liked,
+		Favorited: favorited,
+	}
+
+	res.OkWithData(c, resDto)
+}
+
 func commentModel2ResDTO(comment *models.Comment) *dto.CommentInfo {
 	return &dto.CommentInfo{
 		Id:        comment.ID,

@@ -18,7 +18,7 @@ func SetupRouter() *gin.Engine {
 		{
 			user.POST("/register", controller.Register)
 			user.POST("/verify-register", controller.VerifyRegister)
-			user.GET("/login", controller.Login)
+			user.POST("/login", controller.Login)
 			user.POST("/password/reset", controller.RequestReset)
 			user.POST("/password/verify-reset", controller.VerifyReset)
 		}
@@ -61,6 +61,7 @@ func SetupRouter() *gin.Engine {
 				post.POST("/", controller.CreatePost)
 				post.PUT("/:id", controller.UpdatePost)
 				post.DELETE("/:id", controller.DeletePost)
+				post.GET("/:id/user-status",controller.GetUserStatus)
 
 				comment := post.Group("/:id/comments")
 				{

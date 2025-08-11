@@ -67,6 +67,7 @@ func Login(c *gin.Context) {
 		ID:       user.ID,
 		UserName: user.Username,
 		Email:    user.Email,
+		Avatar:   user.Avatar,
 	}
 	resDTO := dto.LoginResponseDTO{
 		User:  userInfo,
@@ -178,7 +179,7 @@ func userModel2ProfileDto(user *models.User) *dto.ProfileResDTO {
 }
 
 // --------------------头像------------------
-//处理头像上传请求
+// 处理头像上传请求
 func UpdateAvatar(c *gin.Context) {
 	// 1. 从表单获取文件，"avatar" 是前端上传时文件字段的 name
 	file, err := c.FormFile("avatar")

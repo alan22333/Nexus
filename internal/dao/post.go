@@ -68,7 +68,7 @@ func AddPostViewCount(postId uint, incr int) error {
 
 func GetPostsByIds(ids []string) ([]*models.Post, error) {
 	var posts []*models.Post
-	err := DB.Where("id IN (?)", ids).Find(&posts).Error
+	err := DB.Where("id IN (?)", ids).Preload("User").Find(&posts).Error
 	if err != nil {
 		return nil, err
 	}

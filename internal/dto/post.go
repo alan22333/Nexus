@@ -71,9 +71,15 @@ type CreateCommentReqDTO struct {
 	Content  string `json:"content" binding:"required,min=1,max=500"`
 	ParentId uint   `json:"parent_id"`
 }
+
 // ---------------------点赞、收藏---------------------------------
 // ToggleActionResDTO 用于点赞/收藏操作的统一响应
 type ToggleActionResDTO struct {
-	ActionState  bool `json:"action_state"`
-	CurrentCount int64  `json:"current_count"`
+	ActionState  bool  `json:"action_state"`
+	CurrentCount int64 `json:"current_count"`
+}
+
+type GetUserStatusResDTO struct {
+	Liked     bool `json:"liked"`
+	Favorited bool `json:"favorited"`
 }

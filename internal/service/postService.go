@@ -217,7 +217,10 @@ func LikePost(postId uint, userId uint) (bool, int64, error) {
 	if err != nil {
 		return false, 0, erru.ErrInternalServer.Wrap(err)
 	}
-	if post.UserID != userId {
+	// if post.UserID != userId {
+	// 	return false, 0, erru.ErrUnauthorized
+	// }
+	if userId == 0 {
 		return false, 0, erru.ErrUnauthorized
 	}
 	// 查询是否点赞
@@ -270,7 +273,10 @@ func FavoritePost(postId uint, userId uint) (bool, int64, error) {
 	if err != nil {
 		return false, 0, erru.ErrInternalServer.Wrap(err)
 	}
-	if post.UserID != userId {
+	// if post.UserID != userId {
+	// 	return false, 0, erru.ErrUnauthorized
+	// }
+	if userId == 0 {
 		return false, 0, erru.ErrUnauthorized
 	}
 	// 查询是否收藏
@@ -314,4 +320,18 @@ func FavoritePost(postId uint, userId uint) (bool, int64, error) {
 	}
 
 	return actionState, int64(newFavoriteCount), nil
+}
+
+func GetUserStatus(userId, postId uint) (bool, bool, error) {
+	liked, err := dao.IsFavorite(userId, postId)
+	if err != nil {
+		return false, false, erru.ErrInternalServer.Wrap(err)
+	}
+
+	favorited, err := dao.IsLiked(userId, postId)
+	if err != nil {
+		return false, false, erru.ErrInternalServer.Wrap(err)
+	}
+
+	return liked, favorited, nil
 }
