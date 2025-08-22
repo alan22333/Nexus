@@ -12,7 +12,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Register(c *gin.Context) {
+type UserController struct {
+	userService    *service.UserService
+	accountService *service.AccountService
+	middleware     *middleware.MiddlewareManager
+}
+
+func NewUserController(userService *service.UserService, accountService *service.AccountService, middleware *middleware.MiddlewareManager) *UserController {
+	return &UserController{
+		userService:    userService,
+		accountService: accountService,
+		middleware:     middleware,
+	}
+}
+
+func (uc *UserController) Register(c *gin.Context) {
 	var reqDTO dto.RegisterReqDTO
 	err := c.ShouldBindJSON(&reqDTO)
 	if err != nil {
@@ -20,7 +34,7 @@ func Register(c *gin.Context) {
 		return
 	}
 	// log.Println(reqDTO)
-	err = service.Register(&reqDTO)
+	err = uc.userService.Register(&reqDTO)
 	if err != nil {
 		c.Error(err)
 		return
@@ -29,7 +43,7 @@ func Register(c *gin.Context) {
 	res.OkWithMsg(c, "验证码已发送，请确认")
 }
 
-func VerifyRegister(c *gin.Context) {
+func (uc *UserController) VerifyRegister(c *gin.Context) {
 	var reqDto dto.VerifyRegisterReqDTO
 	err := c.ShouldBindJSON(&reqDto)
 	if err != nil {
@@ -37,7 +51,7 @@ func VerifyRegister(c *gin.Context) {
 		return
 	}
 
-	err = service.VerifyRegister(&reqDto)
+	err = uc.userService.VerifyRegister(&reqDto)
 	if err != nil {
 		c.Error(err)
 		return
@@ -45,19 +59,19 @@ func VerifyRegister(c *gin.Context) {
 	res.OkWithMsg(c, "注册成功")
 }
 
-func Login(c *gin.Context) {
+func (uc *UserController) Login(c *gin.Context) {
 	var reqDTO dto.LoginReqDTO
 	if err := c.ShouldBindJSON(&reqDTO); err != nil {
 		c.Error(erru.ErrInvalidParams.Wrap(err))
 		return
 	}
 
-	user, err := service.Login(&reqDTO)
+	user, err := uc.userService.Login(&reqDTO)
 	if err != nil {
 		c.Error(err)
 	}
 	//token
-	token, err := middleware.GenerateToken(user.ID)
+	token, err := uc.middleware.GenerateToken(user.ID)
 	if err != nil {
 		c.Error(erru.New("token 生成错误"))
 		return
@@ -76,7 +90,7 @@ func Login(c *gin.Context) {
 	res.OkWithData(c, resDTO)
 }
 
-func RequestReset(c *gin.Context) {
+func (uc *UserController) RequestReset(c *gin.Context) {
 	var reqDTO dto.RequestResetReqDTO
 	err := c.ShouldBindJSON(&reqDTO)
 	if err != nil {
@@ -84,7 +98,7 @@ func RequestReset(c *gin.Context) {
 		return
 	}
 	// log.Println(reqDTO)
-	err = service.RequestReset(&reqDTO)
+	err = uc.userService.RequestReset(&reqDTO)
 	if err != nil {
 		c.Error(err)
 		return
@@ -92,7 +106,7 @@ func RequestReset(c *gin.Context) {
 	res.OkWithMsg(c, "验证码已发送，请确认")
 }
 
-func VerifyReset(c *gin.Context) {
+func (uc *UserController) VerifyReset(c *gin.Context) {
 	var reqDto dto.VerifyResetReqDTO
 	err := c.ShouldBindJSON(&reqDto)
 	if err != nil {
@@ -100,7 +114,7 @@ func VerifyReset(c *gin.Context) {
 		return
 	}
 
-	err = service.VerifyReset(&reqDto)
+	err = uc.userService.VerifyReset(&reqDto)
 	if err != nil {
 		c.Error(err)
 		return
@@ -118,10 +132,10 @@ func userModel2InfoDto(user *models.User) *dto.UserInfoDTO {
 }
 
 // -------------------用户信息-----------------------------
-func GetProfile(c *gin.Context) {
+func (uc *UserController) GetProfile(c *gin.Context) {
 	userId := c.MustGet("userID").(uint)
 
-	user, err := service.GetProfile(userId)
+	user, err := uc.accountService.GetProfile(userId)
 	if err != nil {
 		c.Error(err)
 		return
@@ -131,7 +145,7 @@ func GetProfile(c *gin.Context) {
 	res.OkWithData(c, resDto)
 }
 
-func UpdateProfile(c *gin.Context) {
+func (uc *UserController) UpdateProfile(c *gin.Context) {
 	var reqDto dto.ProfileReqDTO
 	err := c.ShouldBindJSON(&reqDto)
 	if err != nil {
@@ -141,7 +155,7 @@ func UpdateProfile(c *gin.Context) {
 
 	userId := c.MustGet("userID").(uint)
 
-	user, err := service.UpdateProfile(userId, reqDto)
+	user, err := uc.accountService.UpdateProfile(userId, reqDto)
 	if err != nil {
 		c.Error(err)
 		return
@@ -180,7 +194,7 @@ func userModel2ProfileDto(user *models.User) *dto.ProfileResDTO {
 
 // --------------------头像------------------
 // 处理头像上传请求
-func UpdateAvatar(c *gin.Context) {
+func (uc *UserController) UpdateAvatar(c *gin.Context) {
 	// 1. 从表单获取文件，"avatar" 是前端上传时文件字段的 name
 	file, err := c.FormFile("avatar")
 	if err != nil {
@@ -205,7 +219,7 @@ func UpdateAvatar(c *gin.Context) {
 	userID, _ := c.Get("userID")
 
 	// 4. 调用 Service 层处理核心逻辑
-	avatarURL, err := service.UpdateAvatar(userID.(uint), file)
+	avatarURL, err := uc.accountService.UpdateAvatar(userID.(uint), file)
 	if err != nil {
 		_ = c.Error(err)
 		return

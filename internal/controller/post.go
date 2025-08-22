@@ -12,7 +12,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func ListPosts(c *gin.Context) {
+type PostController struct {
+    postService *service.PostService
+}
+
+func NewPostController(postService *service.PostService) *PostController {
+    return &PostController{
+        postService: postService,
+    }
+}
+
+func (pc *PostController)ListPosts(c *gin.Context) {
 	var reqDto dto.ListPostsReqDTO
 	err := c.ShouldBindQuery(&reqDto)
 	if err != nil {
@@ -27,7 +37,7 @@ func ListPosts(c *gin.Context) {
 		reqDto.Size = 10
 	}
 
-	posts, total, err := service.ListPosts(&reqDto)
+	posts, total, err := pc.postService.ListPosts(&reqDto)
 	if err != nil {
 		c.Error(err)
 		return
@@ -46,14 +56,14 @@ func ListPosts(c *gin.Context) {
 	res.OkWithData(c, listPostsResDTO)
 }
 
-func ListPopularPosts(c *gin.Context) {
+func (pc *PostController)ListPopularPosts(c *gin.Context) {
 	limit := c.Param("limit")
 	limitNum, _ := strconv.Atoi(limit)
 	if limitNum == 0 {
 		limitNum = 10
 	}
 
-	posts, err := service.ListPopularPosts(limitNum)
+	posts, err := pc.postService.ListPopularPosts(limitNum)
 	if err != nil {
 		c.Error(err)
 		return
@@ -67,7 +77,7 @@ func ListPopularPosts(c *gin.Context) {
 	res.OkWithData(c, postInfos)
 }
 
-func GetPost(c *gin.Context) {
+func (pc *PostController)GetPost(c *gin.Context) {
 	// var postId string
 	// err := c.ShouldBindUri(postId)
 	// postId := c.Param("id")
@@ -78,7 +88,7 @@ func GetPost(c *gin.Context) {
 		return
 	}
 	// log.Println("postId:", postId)
-	post, err := service.GetPostById(uint(postId))
+	post, err := pc.postService.GetPostById(uint(postId))
 	if err != nil {
 		c.Error(err)
 		return
@@ -145,7 +155,7 @@ func tagModel2InfoDTO(tag *models.Tag) *dto.TagInfoDTO {
 	}
 }
 
-func CreatePost(c *gin.Context) {
+func (pc *PostController)CreatePost(c *gin.Context) {
 	var reqDto dto.CreatePostReqDTO
 	err := c.ShouldBindJSON(&reqDto)
 	if err != nil {
@@ -155,7 +165,7 @@ func CreatePost(c *gin.Context) {
 	// log.Println(reqDto)
 	userId := c.MustGet("userID").(uint)
 
-	post, err := service.CreatePost(userId, &reqDto)
+	post, err := pc.postService.CreatePost(userId, &reqDto)
 	if err != nil {
 		c.Error(err)
 		return
@@ -166,7 +176,7 @@ func CreatePost(c *gin.Context) {
 	res.Ok(c, postDetailResDto, "创建成功")
 }
 
-func UpdatePost(c *gin.Context) {
+func (pc *PostController)UpdatePost(c *gin.Context) {
 	var reqDto dto.UpdatePostReqDTO
 	// postId := c.Param("id")
 	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -178,7 +188,7 @@ func UpdatePost(c *gin.Context) {
 	}
 	userId := c.MustGet("userID").(uint)
 
-	post, err := service.UpdatePost(userId, uint(postId), reqDto)
+	post, err := pc.postService.UpdatePost(userId, uint(postId), reqDto)
 	if err != nil {
 		c.Error(err)
 		return
@@ -188,7 +198,7 @@ func UpdatePost(c *gin.Context) {
 	res.OkWithData(c, resDto)
 }
 
-func DeletePost(c *gin.Context) {
+func (pc *PostController)DeletePost(c *gin.Context) {
 	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 
 	if postId == 0 {
@@ -197,7 +207,7 @@ func DeletePost(c *gin.Context) {
 	}
 	userId := c.MustGet("userID").(uint)
 
-	err := service.DeletePost(uint(postId), userId)
+	err := pc.postService.DeletePost(uint(postId), userId)
 	if err != nil {
 		c.Error(err)
 		return
@@ -208,12 +218,12 @@ func DeletePost(c *gin.Context) {
 
 // --------------交互相关：点赞、收藏、评论------------------------------
 
-func ListComment(c *gin.Context) {
+func (pc *PostController)ListComment(c *gin.Context) {
 	postID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "10"))
 
-	comments, total, err := service.ListComment(uint(postID), page, size)
+	comments, total, err := pc.postService.ListComment(uint(postID), page, size)
 	if err != nil {
 		c.Error(err)
 		return
@@ -232,11 +242,11 @@ func ListComment(c *gin.Context) {
 	res.OkWithData(c, resDto)
 }
 
-func GetUserStatus(c *gin.Context) {
+func (pc *PostController)GetUserStatus(c *gin.Context) {
 	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	userId := c.MustGet("userID").(uint)
 
-	liked, favorited, err := service.GetUserStatus(userId, uint(postId))
+	liked, favorited, err := pc.postService.GetUserStatus(userId, uint(postId))
 	if err != nil {
 		c.Error(err)
 	}
@@ -259,7 +269,7 @@ func commentModel2ResDTO(comment *models.Comment) *dto.CommentInfo {
 	}
 }
 
-func CreateComment(c *gin.Context) {
+func (pc *PostController)CreateComment(c *gin.Context) {
 	var reqDto dto.CreateCommentReqDTO
 	err := c.ShouldBindJSON(&reqDto)
 	if err != nil {
@@ -270,7 +280,7 @@ func CreateComment(c *gin.Context) {
 	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	userId := c.MustGet("userID").(uint)
 
-	comment, err := service.CreateComment(&reqDto, userId, uint(postId))
+	comment, err := pc.postService.CreateComment(&reqDto, userId, uint(postId))
 	if err != nil {
 		c.Error(err)
 		return
@@ -279,11 +289,11 @@ func CreateComment(c *gin.Context) {
 	res.OkWithData(c, resDto)
 }
 
-func DeleteComment(c *gin.Context) {
+func (pc *PostController)DeleteComment(c *gin.Context) {
 	commentId, _ := strconv.ParseUint(c.Param("commentId"), 10, 32)
 	userId := c.MustGet("userID").(uint)
 
-	err := service.DeleteComment(uint(commentId), userId)
+	err := pc.postService.DeleteComment(uint(commentId), userId)
 	if err != nil {
 		c.Error(err)
 		return
@@ -293,11 +303,11 @@ func DeleteComment(c *gin.Context) {
 }
 
 // ---------------------点赞、收藏--------------------------------
-func LikePost(c *gin.Context) {
+func (pc *PostController)LikePost(c *gin.Context) {
 	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	userId := c.MustGet("userID").(uint)
 
-	actionState, newLikeCount, err := service.LikePost(uint(postId), userId)
+	actionState, newLikeCount, err := pc.postService.LikePost(uint(postId), userId)
 	if err != nil {
 		c.Error(err)
 		return
@@ -311,11 +321,11 @@ func LikePost(c *gin.Context) {
 	res.OkWithData(c, resDto)
 }
 
-func FavoritePost(c *gin.Context) {
+func (pc *PostController)FavoritePost(c *gin.Context) {
 	postId, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	userId := c.MustGet("userID").(uint)
 
-	actionState, newFavoriteCount, err := service.FavoritePost(uint(postId), userId)
+	actionState, newFavoriteCount, err := pc.postService.FavoritePost(uint(postId), userId)
 	if err != nil {
 		c.Error(err)
 		return

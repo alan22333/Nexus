@@ -1,6 +1,7 @@
 package service
 
 import (
+	"Nuxus/configs"
 	"Nuxus/internal/dao"
 	"Nuxus/internal/dto"
 	"Nuxus/internal/models"
@@ -13,17 +14,33 @@ import (
 	"gorm.io/gorm"
 )
 
-func Register(reqDto *dto.RegisterReqDTO) error {
+type UserService struct {
+	userDAO      *dao.UserDAO
+	redisClient  *dao.RedisClient
+	emailService *EmailService
+	config       *configs.Config
+}
+
+func NewUserService(userDAO *dao.UserDAO, redisClient *dao.RedisClient, emailService *EmailService, config *configs.Config) *UserService {
+	return &UserService{
+		userDAO:      userDAO,
+		redisClient:  redisClient,
+		emailService: emailService,
+		config:       config,
+	}
+}
+
+func (us *UserService) Register(reqDto *dto.RegisterReqDTO) error {
 	// 注册流程：
 	// 1. 检查邮箱用户是否存在
 	// 2. 生成验证码，放在redis里
 	// 3. 发送验证码
-	_, err := dao.GetUserByEmail(reqDto.Email)
+	_, err := us.userDAO.GetUserByEmail(reqDto.Email)
 	if err == nil {
 		return erru.ErrEmailAlreadyUsed.Wrap(err)
 	}
 
-	isCool, err := dao.CheckSendCooldown(reqDto.Email)
+	isCool, err := us.redisClient.CheckSendCooldown(reqDto.Email)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
@@ -33,24 +50,24 @@ func Register(reqDto *dto.RegisterReqDTO) error {
 
 	code := utils.GenerateRandomCode(6)
 
-	err = dao.SetVerifyCode(reqDto.Email, code, 5*time.Minute)
+	err = us.redisClient.SetVerifyCode(reqDto.Email, code, 5*time.Minute)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
 
-	if err := SendRegisterMail(reqDto.Email, code); err != nil {
+	if err := us.emailService.SendRegisterMail(reqDto.Email, code); err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
 
 	return nil
 }
 
-func VerifyRegister(reqDto *dto.VerifyRegisterReqDTO) error {
+func (us *UserService) VerifyRegister(reqDto *dto.VerifyRegisterReqDTO) error {
 	// 验证流程：
 	// 1.从redis中取出验证码
 	// 2.验证正确性
 	// 3.创建用户，返回token
-	code, err := dao.GetVerificationCode(reqDto.Email)
+	code, err := us.redisClient.GetVerificationCode(reqDto.Email)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
@@ -59,7 +76,7 @@ func VerifyRegister(reqDto *dto.VerifyRegisterReqDTO) error {
 		return erru.New("验证码错误")
 	}
 
-	dao.DelVerificationCode(reqDto.Email)
+	us.redisClient.DelVerificationCode(reqDto.Email)
 
 	// 按理来说不可能
 	// _, err = dao.GetUserByEmail(reqDto.Email)
@@ -79,7 +96,7 @@ func VerifyRegister(reqDto *dto.VerifyRegisterReqDTO) error {
 		Password: string(encryptedPwd),
 	}
 
-	_, err = dao.CreateUser(user)
+	_, err = us.userDAO.CreateUser(user)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
@@ -87,8 +104,8 @@ func VerifyRegister(reqDto *dto.VerifyRegisterReqDTO) error {
 	return nil
 }
 
-func Login(req *dto.LoginReqDTO) (*models.User, error) {
-	user, err := dao.GetUserByIdentifier(req.Identifier)
+func (us *UserService) Login(req *dto.LoginReqDTO) (*models.User, error) {
+	user, err := us.userDAO.GetUserByIdentifier(req.Identifier)
 	if err != nil {
 		// 如果错误是 gorm.ErrRecordNotFound，说明用户不存在
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -107,8 +124,8 @@ func Login(req *dto.LoginReqDTO) (*models.User, error) {
 	return user, nil
 }
 
-func RequestReset(reqDto *dto.RequestResetReqDTO) error {
-	_, err := dao.GetUserByEmail(reqDto.Email)
+func (us *UserService) RequestReset(reqDto *dto.RequestResetReqDTO) error {
+	_, err := us.userDAO.GetUserByEmail(reqDto.Email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return erru.ErrUserNotFound
@@ -116,7 +133,7 @@ func RequestReset(reqDto *dto.RequestResetReqDTO) error {
 		return erru.ErrInternalServer.Wrap(err)
 	}
 
-	isCool, err := dao.CheckSendCooldown(reqDto.Email)
+	isCool, err := us.redisClient.CheckSendCooldown(reqDto.Email)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
@@ -126,22 +143,22 @@ func RequestReset(reqDto *dto.RequestResetReqDTO) error {
 
 	code := utils.GenerateRandomCode(6)
 
-	err = dao.SetVerifyCode(reqDto.Email, code, 5*time.Minute)
+	err = us.redisClient.SetVerifyCode(reqDto.Email, code, 5*time.Minute)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
 
-	if err := SendResetPasswordMail(reqDto.Email, code); err != nil {
+	if err := us.emailService.SendResetPasswordMail(reqDto.Email, code); err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
 
 	return nil
 }
 
-func VerifyReset(reqDto *dto.VerifyResetReqDTO) error {
+func (us *UserService) VerifyReset(reqDto *dto.VerifyResetReqDTO) error {
 
 	// 1.检查是否存在user
-	user, err := dao.GetUserByEmail(reqDto.Email)
+	user, err := us.userDAO.GetUserByEmail(reqDto.Email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return erru.ErrUserNotFound
@@ -149,7 +166,7 @@ func VerifyReset(reqDto *dto.VerifyResetReqDTO) error {
 		return erru.ErrInternalServer.Wrap(err)
 	}
 	// 2.检查验证码是否正确
-	code, err := dao.GetVerificationCode(reqDto.Email)
+	code, err := us.redisClient.GetVerificationCode(reqDto.Email)
 	if err != nil || code != reqDto.Code {
 		return erru.New("验证码错误")
 	}
@@ -165,7 +182,7 @@ func VerifyReset(reqDto *dto.VerifyResetReqDTO) error {
 	if err != nil {
 		return erru.New("加密失败")
 	}
-	err = dao.UpdateUserPassword(user.ID, string(newPwd))
+	err = us.userDAO.UpdateUserPassword(user.ID, string(newPwd))
 
 	return err
 }

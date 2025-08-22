@@ -10,16 +10,32 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListPosts(reqDto *dto.ListPostsReqDTO) ([]*models.Post, int64, error) {
-	posts, total, err := dao.ListPosts(reqDto)
+type PostService struct {
+	postDAO     *dao.PostDAO
+	tagDAO      *dao.TagDAO
+	repository  *dao.Repository
+	redisClient *dao.RedisClient
+}
+
+func NewPostService(postDAO *dao.PostDAO, tagDAO *dao.TagDAO, repository *dao.Repository, redisClient *dao.RedisClient) *PostService {
+	return &PostService{
+		postDAO:     postDAO,
+		tagDAO:      tagDAO,
+		repository:  repository,
+		redisClient: redisClient,
+	}
+}
+
+func (p *PostService) ListPosts(reqDto *dto.ListPostsReqDTO) ([]*models.Post, int64, error) {
+	posts, total, err := p.postDAO.ListPosts(reqDto)
 	if err != nil {
 		return nil, 0, erru.ErrInternalServer.Wrap(err)
 	}
 	return posts, total, nil
 }
 
-func GetPostById(id uint) (*models.Post, error) {
-	post, err := dao.GetPostById(id)
+func (p *PostService) GetPostById(id uint) (*models.Post, error) {
+	post, err := p.postDAO.GetPostById(id)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -27,7 +43,7 @@ func GetPostById(id uint) (*models.Post, error) {
 	// 异步更新
 	go func() {
 		// 增加浏览量
-		err := dao.IncrementPostViewCount(id)
+		err := p.redisClient.IncrementPostViewCount(id)
 		if err != nil {
 			// TODO:异步错误处理
 			log.Fatal(erru.New("增加浏览量失败"))
@@ -37,7 +53,7 @@ func GetPostById(id uint) (*models.Post, error) {
 		// 点赞 +30
 		// 评论 +20
 		// 收藏 +30
-		err = dao.IncrementPostRank(id, 10)
+		err = p.redisClient.IncrementPostRank(id, 10)
 		if err != nil {
 			log.Fatal(erru.New("增加热门积分失败"))
 		}
@@ -45,9 +61,9 @@ func GetPostById(id uint) (*models.Post, error) {
 	return post, nil
 }
 
-func ListPopularPosts(limit int) ([]*models.Post, error) {
+func (p *PostService) ListPopularPosts(limit int) ([]*models.Post, error) {
 	// get popular postIds from redis
-	ids, err := dao.GetPopularPostIDs(int64(limit))
+	ids, err := p.redisClient.GetPopularPostIDs(int64(limit))
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -57,7 +73,7 @@ func ListPopularPosts(limit int) ([]*models.Post, error) {
 	}
 
 	// get post from mysql
-	posts, err := dao.GetPostsByIds(ids)
+	posts, err := p.postDAO.GetPostsByIds(ids)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -65,9 +81,9 @@ func ListPopularPosts(limit int) ([]*models.Post, error) {
 	return posts, err
 }
 
-func CreatePost(userID uint, reqDto *dto.CreatePostReqDTO) (*models.Post, error) {
+func (p *PostService) CreatePost(userID uint, reqDto *dto.CreatePostReqDTO) (*models.Post, error) {
 	// find or create Tags
-	tags, err := dao.FindOrCreateTagsByNames(reqDto.Tags)
+	tags, err := p.tagDAO.FindOrCreateTagsByNames(reqDto.Tags)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -79,12 +95,12 @@ func CreatePost(userID uint, reqDto *dto.CreatePostReqDTO) (*models.Post, error)
 	post.UserID = userID
 	post.Tags = tags
 
-	err = dao.CreatePost(post)
+	err = p.postDAO.CreatePost(post)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
 
-	fullPost, err := dao.GetPostById(post.ID)
+	fullPost, err := p.postDAO.GetPostById(post.ID)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -92,13 +108,13 @@ func CreatePost(userID uint, reqDto *dto.CreatePostReqDTO) (*models.Post, error)
 	return fullPost, nil
 }
 
-func UpdatePost(userId uint, postId uint, reqDto dto.UpdatePostReqDTO) (*models.Post, error) {
+func (p *PostService) UpdatePost(userId uint, postId uint, reqDto dto.UpdatePostReqDTO) (*models.Post, error) {
 	// 更新逻辑
 	// 1.检查post是否存在
 	// 2.检查是不是当前user的post
 	// 3.更新post
 
-	post, err := dao.GetPostById(postId)
+	post, err := p.postDAO.GetPostById(postId)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -106,7 +122,7 @@ func UpdatePost(userId uint, postId uint, reqDto dto.UpdatePostReqDTO) (*models.
 		return nil, erru.ErrUnauthorized
 	}
 
-	tags, err := dao.FindOrCreateTagsByNames(reqDto.Tags)
+	tags, err := p.tagDAO.FindOrCreateTagsByNames(reqDto.Tags)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -115,15 +131,15 @@ func UpdatePost(userId uint, postId uint, reqDto dto.UpdatePostReqDTO) (*models.
 	post.Content = reqDto.Content
 	post.Tags = tags
 
-	post, err = dao.UpdatePost(post)
+	post, err = p.postDAO.UpdatePost(post)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
 	return post, nil
 }
 
-func DeletePost(postId uint, userId uint) error {
-	post, err := dao.GetPostById(postId)
+func (p *PostService) DeletePost(postId uint, userId uint) error {
+	post, err := p.postDAO.GetPostById(postId)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
@@ -131,21 +147,21 @@ func DeletePost(postId uint, userId uint) error {
 		return erru.ErrUnauthorized
 	}
 
-	return dao.DeletePost(postId)
+	return p.postDAO.DeletePost(postId)
 }
 
 // -------------------评论相关------------------------------
-func ListComment(postId uint, page int, size int) ([]*models.Comment, int64, error) {
+func (p *PostService) ListComment(postId uint, page int, size int) ([]*models.Comment, int64, error) {
 	// 评论列表逻辑
 	// 1.检查帖子是否存在
 	// 2.dao进行分页查询
 
-	_, err := dao.GetPostById(postId)
+	_, err := p.postDAO.GetPostById(postId)
 	if err != nil {
 		return nil, 0, erru.ErrInternalServer.Wrap(err)
 	}
 
-	comments, total, err := dao.ListComment(postId, page, size)
+	comments, total, err := p.postDAO.ListComment(postId, page, size)
 	if err != nil {
 		return nil, 0, erru.ErrInternalServer.Wrap(err)
 	}
@@ -153,9 +169,9 @@ func ListComment(postId uint, page int, size int) ([]*models.Comment, int64, err
 	return comments, total, nil
 }
 
-func CreateComment(req *dto.CreateCommentReqDTO, userId uint, postId uint) (*models.Comment, error) {
+func (p *PostService) CreateComment(req *dto.CreateCommentReqDTO, userId uint, postId uint) (*models.Comment, error) {
 
-	_, err := dao.GetPostById(postId)
+	_, err := p.postDAO.GetPostById(postId)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -169,19 +185,19 @@ func CreateComment(req *dto.CreateCommentReqDTO, userId uint, postId uint) (*mod
 
 	// TODO:（数据库事务）
 	// 确保“创建评论”和“帖子评论数+1”这两个操作，要么都成功，要么都失败
-	dao.DB.Transaction(func(tx *gorm.DB) error {
+	p.repository.DB().Transaction(func(tx *gorm.DB) error {
 		// 1. 在事务中创建评论
-		if err := dao.CreateComment(tx, comment); err != nil {
+		if err := p.postDAO.CreateComment(tx, comment); err != nil {
 			return err
 		}
 		// 2. 在事务中更新帖子的评论数
-		if err := dao.UpdatePostCounter(tx, postId, "comment_count", 1); err != nil {
+		if err := p.postDAO.UpdatePostCounter(tx, postId, "comment_count", 1); err != nil {
 			return err
 		}
 		return nil // 返回 nil，事务就会被提交
 	})
 
-	fullComment, err := dao.GetCommentById(comment.ID)
+	fullComment, err := p.postDAO.GetCommentById(comment.ID)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
@@ -189,8 +205,8 @@ func CreateComment(req *dto.CreateCommentReqDTO, userId uint, postId uint) (*mod
 	return fullComment, nil
 }
 
-func DeleteComment(commentId uint, userId uint) error {
-	comment, err := dao.GetCommentById(commentId)
+func (p *PostService) DeleteComment(commentId uint, userId uint) error {
+	comment, err := p.postDAO.GetCommentById(commentId)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
@@ -202,7 +218,7 @@ func DeleteComment(commentId uint, userId uint) error {
 	// TODO:递归删除 or 逻辑删除
 	// 我选 后者
 	comment.Content = "该评论已删除"
-	err = dao.UpdateComment(comment)
+	err = p.postDAO.UpdateComment(comment)
 	if err != nil {
 		return erru.ErrInternalServer.Wrap(err)
 	}
@@ -210,9 +226,9 @@ func DeleteComment(commentId uint, userId uint) error {
 }
 
 // --------------------点赞、收藏------------------------------
-func LikePost(postId uint, userId uint) (bool, int64, error) {
+func (p *PostService) LikePost(postId uint, userId uint) (bool, int64, error) {
 	// 验证
-	post, err := dao.GetPostById(postId)
+	post, err := p.postDAO.GetPostById(postId)
 	if err != nil {
 		return false, 0, erru.ErrInternalServer.Wrap(err)
 	}
@@ -223,7 +239,7 @@ func LikePost(postId uint, userId uint) (bool, int64, error) {
 		return false, 0, erru.ErrUnauthorized
 	}
 	// 查询是否点赞
-	isLiked, err := dao.IsLiked(userId, postId)
+	isLiked, err := p.postDAO.IsLiked(userId, postId)
 	if err != nil {
 		return false, 0, erru.ErrInternalServer.Wrap(err)
 	}
@@ -231,21 +247,21 @@ func LikePost(postId uint, userId uint) (bool, int64, error) {
 	var actionState bool
 	var newLikeCount int
 
-	err = dao.DB.Transaction(func(tx *gorm.DB) error {
+	err = p.repository.DB().Transaction(func(tx *gorm.DB) error {
 
 		if isLiked == true {
-			err := dao.RemoveLike(tx, userId, postId)
+			err := p.postDAO.RemoveLike(tx, userId, postId)
 			if err != nil {
 				return err
 			}
-			dao.UpdatePostCounter(tx, postId, "like_count", -1)
+			p.postDAO.UpdatePostCounter(tx, postId, "like_count", -1)
 			actionState = false
 		} else {
-			err := dao.AddLike(tx, userId, postId)
+			err := p.postDAO.AddLike(tx, userId, postId)
 			if err != nil {
 				return err
 			}
-			dao.UpdatePostCounter(tx, postId, "like_count", 1)
+			p.postDAO.UpdatePostCounter(tx, postId, "like_count", 1)
 			actionState = true
 		}
 		return nil
@@ -266,9 +282,9 @@ func LikePost(postId uint, userId uint) (bool, int64, error) {
 	return actionState, int64(newLikeCount), nil
 }
 
-func FavoritePost(postId uint, userId uint) (bool, int64, error) {
+func (p *PostService) FavoritePost(postId uint, userId uint) (bool, int64, error) {
 	// 验证
-	post, err := dao.GetPostById(postId)
+	post, err := p.postDAO.GetPostById(postId)
 	if err != nil {
 		return false, 0, erru.ErrInternalServer.Wrap(err)
 	}
@@ -279,7 +295,7 @@ func FavoritePost(postId uint, userId uint) (bool, int64, error) {
 		return false, 0, erru.ErrUnauthorized
 	}
 	// 查询是否收藏
-	isFavorite, err := dao.IsFavorite(userId, postId)
+	isFavorite, err := p.postDAO.IsFavorite(userId, postId)
 	if err != nil {
 		return false, 0, erru.ErrInternalServer.Wrap(err)
 	}
@@ -287,20 +303,20 @@ func FavoritePost(postId uint, userId uint) (bool, int64, error) {
 	var actionState bool
 	var newFavoriteCount int
 
-	err = dao.DB.Transaction(func(tx *gorm.DB) error {
+	err = p.repository.DB().Transaction(func(tx *gorm.DB) error {
 		if isFavorite == true {
-			err := dao.RemoveFavorite(tx, userId, postId)
+			err := p.postDAO.RemoveFavorite(tx, userId, postId)
 			if err != nil {
 				return err
 			}
-			dao.UpdatePostCounter(tx, postId, "favorite_count", -1)
+			p.postDAO.UpdatePostCounter(tx, postId, "favorite_count", -1)
 			actionState = false
 		} else {
-			err := dao.AddFavorite(tx, userId, postId)
+			err := p.postDAO.AddFavorite(tx, userId, postId)
 			if err != nil {
 				return err
 			}
-			dao.UpdatePostCounter(tx, postId, "favorite_count", 1)
+			p.postDAO.UpdatePostCounter(tx, postId, "favorite_count", 1)
 			actionState = true
 		}
 		return nil
@@ -321,13 +337,13 @@ func FavoritePost(postId uint, userId uint) (bool, int64, error) {
 	return actionState, int64(newFavoriteCount), nil
 }
 
-func GetUserStatus(userId, postId uint) (bool, bool, error) {
-	liked, err := dao.IsFavorite(userId, postId)
+func (p *PostService) GetUserStatus(userId, postId uint) (bool, bool, error) {
+	liked, err := p.postDAO.IsFavorite(userId, postId)
 	if err != nil {
 		return false, false, erru.ErrInternalServer.Wrap(err)
 	}
 
-	favorited, err := dao.IsLiked(userId, postId)
+	favorited, err := p.postDAO.IsLiked(userId, postId)
 	if err != nil {
 		return false, false, erru.ErrInternalServer.Wrap(err)
 	}

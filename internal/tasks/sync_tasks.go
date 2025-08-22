@@ -8,7 +8,18 @@ import (
 	"strings"
 )
 
-func SyncViewCountsToDB() {
+type SyncTask struct {
+	postDAO     *dao.PostDAO
+	redisClient *dao.RedisClient
+}
+
+func NewSyncTask(postDAO *dao.PostDAO, redisClient *dao.RedisClient) *SyncTask {
+	return &SyncTask{
+		redisClient: redisClient,
+	}
+}
+
+func (s *SyncTask) SyncViewCountsToDB() {
 	log.Println("开始同步浏览量到DB")
 
 	ctx := context.Background()
@@ -21,7 +32,7 @@ func SyncViewCountsToDB() {
 	matchPattern := "nexus:post:view:*"
 	for {
 		var scanResult []string
-		scanResult, cursor, err = dao.RedisClient.Scan(ctx, cursor, matchPattern, 100).Result()
+		scanResult, cursor, err = s.redisClient.Scan(ctx, cursor, matchPattern, 100)
 		if err != nil {
 			log.Printf("扫描 Redis Key 失败: %v", err)
 			return // 发生错误，终止本次任务
@@ -43,7 +54,7 @@ func SyncViewCountsToDB() {
 		// 3. 施展“乾坤挪移”大法 (GETSET)，原子性地获取并清零
 		// GETSET key 0 会返回 key 的旧值，然后将 key 的值设为 "0"
 		// 这确保了我们拿到的是准确的增量，并且不会丢失在操作期间的新增浏览
-		incrementStr, err := dao.RedisClient.GetSet(ctx, key, "0").Result()
+		incrementStr, err := s.redisClient.GetSet(ctx, key, "0")
 		if err != nil {
 			log.Printf("获取并重置 Key [%s] 失败: %v", key, err)
 			continue // 跳过这个 key，处理下一个
@@ -67,7 +78,7 @@ func SyncViewCountsToDB() {
 		}
 
 		// 5. 将增量归入“宗门宝库” (MySQL)
-		err = dao.AddPostViewCount(uint(postID), int(increment))
+		err = s.postDAO.AddPostViewCount(uint(postID), int(increment))
 		if err != nil {
 			log.Printf("更新帖子ID [%d] 的浏览量失败: %v。丢失的增量: %d", postID, err, increment)
 			// 重要：这里需要有错误处理策略。最简单的是记录日志。

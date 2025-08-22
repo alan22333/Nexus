@@ -18,8 +18,20 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetProfile(userId uint) (*models.User, error) {
-	user, err := dao.GetUserById(userId)
+type AccountService struct {
+	userDAO *dao.UserDAO
+	config *configs.Config
+}
+
+func NewAccountService(userDAO *dao.UserDAO,config *configs.Config) *AccountService {
+	return &AccountService{
+		userDAO: userDAO,
+		config: config,
+	}
+}
+
+func (a *AccountService) GetProfile(userId uint) (*models.User, error) {
+	user, err := a.userDAO.GetUserById(userId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, erru.ErrResourceNotFound
@@ -29,23 +41,23 @@ func GetProfile(userId uint) (*models.User, error) {
 	return user, nil
 }
 
-func UpdateProfile(userId uint, reqDto dto.ProfileReqDTO) (*models.User, error) {
-	user, err := dao.GetUserById(userId)
+func (a *AccountService) UpdateProfile(userId uint, reqDto dto.ProfileReqDTO) (*models.User, error) {
+	user, err := a.userDAO.GetUserById(userId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, erru.ErrResourceNotFound
 		}
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
-	updateUser(user, &reqDto)
-	user, err = dao.UpdateProfile(user)
+	a.updateUser(user, &reqDto)
+	user, err = a.userDAO.UpdateProfile(user)
 	if err != nil {
 		return nil, erru.ErrInternalServer.Wrap(err)
 	}
 	return user, nil
 }
 
-func updateUser(user *models.User, reqDto *dto.ProfileReqDTO) {
+func (a *AccountService) updateUser(user *models.User, reqDto *dto.ProfileReqDTO) {
 	user.Gender = reqDto.Gender
 	user.Phone = reqDto.Phone
 	user.QQ = reqDto.QQ
@@ -79,8 +91,8 @@ func getQiniuZone(zoneStr string) *storage.Zone {
 }
 
 // UpdateAvatar 使用七牛云 Kodo 处理头像上传
-func UpdateAvatar(userID uint, file *multipart.FileHeader) (string, error) {
-	qiniuConf := configs.Conf.Qiniu
+func (a *AccountService) UpdateAvatar(userID uint, file *multipart.FileHeader) (string, error) {
+	qiniuConf := a.config.Qiniu
 
 	// 1. 生成上传凭证
 	putPolicy := storage.PutPolicy{
@@ -120,7 +132,7 @@ func UpdateAvatar(userID uint, file *multipart.FileHeader) (string, error) {
 	avatarURL := fmt.Sprintf("http://%s/%s", qiniuConf.Domain, ret.Key)
 
 	// 8. 将新的 URL 更新到数据库
-	if err := dao.UpdateUserAvatar(userID, avatarURL); err != nil {
+	if err := a.userDAO.UpdateUserAvatar(userID, avatarURL); err != nil {
 		return "", erru.ErrInternalServer.Wrap(err)
 	}
 

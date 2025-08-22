@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var Conf = new(Config)
+// var Conf = new(Config)
 
 type Config struct {
 	Server ServerConfig `mapstructure:"server"`
@@ -56,42 +56,38 @@ type QiniuConfig struct {
 	Zone      string `mapstructure:"zone"`
 }
 
-func Init() {
-	// 设置工作目录，方便读取
+
+// LoadConfig 用于Wire依赖注入
+func LoadConfig() (*Config, error) {
 	workDir, err := os.Getwd()
 	if err != nil {
-		log.Fatalf("Failed to get working directory: %v", err)
+		return nil, err
 	}
 
-	// 设置配置文件，不带后缀
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
-	// 添加配置文件的搜索路径
-	// 这里假设 `configs` 目录与可执行文件或项目根目录在同一层级
 	viper.AddConfigPath(workDir)
 
-	// 读取配置文件
 	err = viper.ReadInConfig()
 	if err != nil {
-		log.Fatalf("viper.ReadInConfig failed, err: %v", err)
+		return nil, err
 	}
 
-	// 解析配置
-	err = viper.Unmarshal(Conf)
+	var config Config
+	err = viper.Unmarshal(&config)
 	if err != nil {
-		log.Fatalf("viper.Unmarshal failed, err: %v", err)
+		return nil, err
 	}
 
-	// (可选) 开启监视功能，当配置文件发生变化时自动重新加载
-	// 这在开发环境中非常有用，但在生产环境中需要谨慎使用
+	// 可选：监视配置文件变化
 	viper.WatchConfig()
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		log.Println("Config file changed:", e.Name)
-		if err := viper.Unmarshal(Conf); err != nil {
+		if err := viper.Unmarshal(&config); err != nil {
 			log.Printf("viper.Unmarshal on config change failed, err: %v", err)
 		}
 	})
 
-	log.Println("Configuration loaded and initialized successfully!")
-
+	log.Println("Configuration loaded successfully!")
+	return &config, nil
 }

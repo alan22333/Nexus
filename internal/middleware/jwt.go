@@ -11,8 +11,15 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// 假设的配置，你应该从你的 config 包导入
-var jwtSecret = []byte(configs.Conf.JWT.Secret)
+type JWTMiddleware struct {
+	config *configs.Config
+}
+
+func NewJWTMiddleware(config *configs.Config) *JWTMiddleware {
+	return &JWTMiddleware{
+		config: config,
+	}
+}
 
 // var duration = configs.Conf.JWT.ExpireHours
 
@@ -22,7 +29,8 @@ type MyClaims struct {
 }
 
 // 中间件方法
-func JWTAuth() gin.HandlerFunc {
+// JWTAuth 中间件方法 - 完全使用注入的配置
+func (jm *JWTMiddleware) JWTAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.Request.Header.Get("Authorization")
 		if authHeader == "" {
@@ -34,7 +42,6 @@ func JWTAuth() gin.HandlerFunc {
 		// 按空格分割，格式应为 "Bearer <token>"
 		parts := strings.SplitN(authHeader, " ", 2)
 		if !(len(parts) == 2 && parts[0] == "Bearer") {
-			// 格式不合法，如没有 Bearer 前缀，返回失败
 			res.FailWithAppErr(c, erru.ErrInvalidRequestHeader)
 			c.Abort()
 			return
@@ -43,13 +50,14 @@ func JWTAuth() gin.HandlerFunc {
 		// 提取 token 字符串部分
 		tokenString := parts[1]
 
-		// 使用 ParseWithClaims 解析 JWT，并指定我们自定义的 claims 结构体
+		// 使用注入的配置中的密钥
+		jwtSecret := []byte(jm.config.JWT.Secret)
+
+		// 使用 ParseWithClaims 解析 JWT
 		token, err := jwt.ParseWithClaims(tokenString, &MyClaims{}, func(token *jwt.Token) (any, error) {
-			// 返回密钥，用于验证签名
 			return jwtSecret, nil
 		})
 		if err != nil {
-			// token 解析失败（可能是签名错误、过期等）
 			res.FailWithAppErr(c, erru.ErrTokenInvalid.Wrap(err))
 			c.Abort()
 			return
@@ -57,11 +65,9 @@ func JWTAuth() gin.HandlerFunc {
 
 		// 校验通过后，取出 claims 中的数据
 		if claims, ok := token.Claims.(*MyClaims); ok && token.Valid {
-			// 将用户 ID 写入 Gin 的 context 中，方便后续处理器使用
 			c.Set("userID", claims.UserID)
-			c.Next() // 继续执行后续处理器
+			c.Next()
 		} else {
-			// Token 无效
 			res.FailWithAppErr(c, erru.ErrTokenInvalid)
 			c.Abort()
 			return
@@ -69,23 +75,19 @@ func JWTAuth() gin.HandlerFunc {
 	}
 }
 
-// GenerateToken 生成一个 JWT token（传入用户ID）
-func GenerateToken(userID uint) (string, error) {
-
-	// 动态加载，放弃全局变量
-	expireHours := time.Duration(configs.Conf.JWT.ExpireHours)
+// GenerateToken 生成JWT token
+func (jm *JWTMiddleware) GenerateToken(userID uint) (string, error) {
+	expireHours := time.Duration(jm.config.JWT.ExpireHours)
+	jwtSecret := []byte(jm.config.JWT.Secret)
 
 	claims := MyClaims{
-		UserID: userID, // 写入自定义字段
+		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expireHours * time.Hour)), // 设置7天过期时间
-			Issuer:    "Nexus",                                                     // 谁签发了这个token（可选）
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expireHours * time.Hour)),
+			Issuer:    "Nexus",
 		},
 	}
 
-	// 生成 token，使用 HS256 对称加密算法
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// 用密钥签名并转成字符串
 	return token.SignedString(jwtSecret)
 }

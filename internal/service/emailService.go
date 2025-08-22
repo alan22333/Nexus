@@ -8,9 +8,17 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+type EmailService struct {
+	config *configs.Config
+}
+
+func NewEmailService(config *configs.Config) *EmailService {
+	return &EmailService{config: config}
+}
+
 // SendVerificationMail 是一个专门发送验证码邮件的便捷函数
-func SendRegisterMail(toEmail, code string) error {
-	cfg := configs.Conf.SMTP
+func (e *EmailService) SendRegisterMail(toEmail, code string) error {
+	cfg := e.config.SMTP
 
 	subject := fmt.Sprintf("[%s] 您的邮箱验证码", cfg.FromName)
 
@@ -31,12 +39,12 @@ func SendRegisterMail(toEmail, code string) error {
 	</html>
 	`, cfg.FromName, code, cfg.FromName)
 
-	return sendMail(toEmail, subject, body)
+	return e.sendMail(toEmail, subject, body)
 }
 
 // SendResetPasswordMail 发送重置密码邮件的便捷函数
-func SendResetPasswordMail(toEmail, code string) error {
-	cfg := configs.Conf.SMTP
+func (e *EmailService) SendResetPasswordMail(toEmail, code string) error {
+	cfg := e.config.SMTP
 	subject := fmt.Sprintf("[%s] 您的密码重置请求", cfg.FromName)
 	body := fmt.Sprintf(`
     <html><body>
@@ -47,14 +55,14 @@ func SendResetPasswordMail(toEmail, code string) error {
         <p>如果这不是您本人的操作，请忽略此邮件。</p>
     </body></html>
     `, cfg.FromName, code)
-	return sendMail(toEmail, subject, body)
+	return e.sendMail(toEmail, subject, body)
 }
 
 // sendMail 是底层的邮件发送实现
 // 它不关心邮件内容，只负责发送
-func sendMail(toEmail, subject, body string) error {
+func (e *EmailService) sendMail(toEmail, subject, body string) error {
 	// 从全局配置中获取 SMTP 信息
-	cfg := configs.Conf.SMTP
+	cfg := e.config.SMTP
 
 	m := gomail.NewMessage()
 
